@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="64dp"
+    android:orientation="horizontal" android:gravity="center_vertical" android:background="#1B1F26">
+    <ImageView android:id="@+id/n_cover" android:layout_width="64dp" android:layout_height="64dp"
+        android:scaleType="centerCrop" />
+    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+        android:orientation="vertical" android:paddingLeft="12dp" android:paddingRight="6dp">
+        <TextView android:id="@+id/n_title" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:maxLines="1" android:ellipsize="end" android:textColor="#E8E8E8" android:textSize="14sp"
+            android:textStyle="bold" android:letterSpacing="0.06" />
+        <TextView android:id="@+id/n_artist" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:maxLines="1" android:ellipsize="end" android:textColor="#C8CDD2" android:textSize="12sp"
+            android:letterSpacing="0.06" />
+    </LinearLayout>
+    <ImageButton android:id="@+id/n_prev" android:layout_width="34dp" android:layout_height="34dp"
+        android:background="@drawable/n_btn_circle" android:padding="8dp" android:scaleType="fitCenter" />
+    <ImageButton android:id="@+id/n_play" android:layout_width="40dp" android:layout_height="40dp"
+        android:layout_marginLeft="8dp" android:layout_marginRight="8dp"
+        android:background="@drawable/n_btn_circle" android:padding="10dp" android:scaleType="fitCenter" />
+    <ImageButton android:id="@+id/n_next" android:layout_width="34dp" android:layout_height="34dp"
+        android:layout_marginRight="10dp"
+        android:background="@drawable/n_btn_circle" android:padding="8dp" android:scaleType="fitCenter" />
+</LinearLayout>

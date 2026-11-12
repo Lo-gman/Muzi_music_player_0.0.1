@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/w_root"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="horizontal" android:gravity="center_vertical"
+    android:background="#CCF0F4F5" android:padding="4dp">
+    <ImageView android:id="@+id/w_cover" android:layout_width="52dp" android:layout_height="52dp"
+        android:layout_marginLeft="4dp" android:scaleType="centerCrop"
+        android:src="@drawable/notif_cover_placeholder" />
+    <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
+        android:orientation="vertical" android:paddingLeft="10dp" android:paddingRight="4dp"
+        android:gravity="center_vertical">
+        <TextView android:id="@+id/w_title" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:maxLines="1" android:ellipsize="end" android:text="MUZI MUSIC"
+            android:textColor="#101820" android:textSize="13sp" android:textStyle="bold"
+            android:letterSpacing="0.05" />
+        <TextView android:id="@+id/w_artist" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:maxLines="1" android:ellipsize="end" android:text="TAP TO OPEN"
+            android:textColor="#2a3a4a" android:textSize="10sp" android:letterSpacing="0.05" />
+    </LinearLayout>
+    <ImageButton android:id="@+id/w_fav" android:layout_width="28dp" android:layout_height="28dp"
+        android:background="@null" android:padding="5dp" android:scaleType="fitCenter"
+        android:src="@drawable/ic_n_heart" />
+    <ImageButton android:id="@+id/w_prev" android:layout_width="32dp" android:layout_height="32dp"
+        android:layout_marginLeft="2dp"
+        android:background="@drawable/n_btn_circle" android:padding="7dp" android:scaleType="fitCenter"
+        android:src="@drawable/ic_n_prev" />
+    <ImageButton android:id="@+id/w_play" android:layout_width="40dp" android:layout_height="40dp"
+        android:layout_marginLeft="6dp" android:layout_marginRight="6dp"
+        android:background="@drawable/n_btn_circle" android:padding="9dp" android:scaleType="fitCenter"
+        android:src="@drawable/ic_n_play" />
+    <ImageButton android:id="@+id/w_next" android:layout_width="32dp" android:layout_height="32dp"
+        android:layout_marginRight="4dp"
+        android:background="@drawable/n_btn_circle" android:padding="7dp" android:scaleType="fitCenter"
+        android:src="@drawable/ic_n_next" />
+</LinearLayout>
