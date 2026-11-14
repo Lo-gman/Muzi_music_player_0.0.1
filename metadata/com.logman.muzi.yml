@@ -1,0 +1,21 @@
+Categories:
+  - Multimedia
+License: MIT
+AuthorName: Logman
+SourceCode: https://github.com/Lo-gman/Muzi_music_player_0.0.1
+IssueTracker: https://github.com/Lo-gman/Muzi_music_player_0.0.1/issues
+
+AutoUpdateMode: Version %v
+UpdateCheckMode: Tags
+CurrentVersion: '2.0'
+CurrentVersionCode: 2
+
+Builds:
+  - versionName: '2.0'
+    versionCode: 2
+    commit: v0.0.1
+    subdir: app
+    gradle:
+      - yes
+
+ArchivePolicy: 0 releases

@@ -1,0 +1,8 @@
+Muzi is a 100% native Kotlin Android music player built strictly with Android platform APIs.
+
+Features:
+- Pure native Android implementation without third-party libraries or WebViews
+- Built-in equalizer and audio focus handling
+- Background playback and lock-screen notification controls
+- Custom home-screen widgets
+- Lightweight, fast, and privacy-focused
