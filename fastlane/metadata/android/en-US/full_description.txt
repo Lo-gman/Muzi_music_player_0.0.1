@@ -1,8 +1,37 @@
-Muzi is a 100% native Kotlin Android music player built strictly with Android platform APIs.
+Press play on what you already love.
+Muzi Music turns the songs on your phone into a polished listening experience, with a minimal design that keeps your music front and centre. Open it, and your library is already there.
 
-Features:
-- Pure native Android implementation without third-party libraries or WebViews
-- Built-in equalizer and audio focus handling
-- Background playback and lock-screen notification controls
-- Custom home-screen widgets
-- Lightweight, fast, and privacy-focused
+✦ Effortless from the first tap
+
+Muzi finds your music the moment you open it. Call recordings, voice notes, ringtones and alarms are skipped, so only real music makes the cut.
+
+✦ A minimal player worth looking at
+
+Big, bold cover art, a smooth seek bar, shuffle, repeat and favorites, all on a clean, uncluttered screen. Swipe between Now Playing, Library and Settings with fluid, graceful transitions.
+
+✦ Always within reach
+Keep listening with the screen off.
+Control your music from the notification, lock screen or headphone buttons.
+Pin a minimal dark or light home-screen widget and skip tracks without opening the app.
+Calls pause your music, and it resumes when they end.
+Unplug your headphones and the music pauses.
+Muzi remembers exactly where you stopped.
+
+✦ Your library, your way
+
+Search instantly, sort by name, recent or artist, or show only your favorites. Hold a song’s name to share or delete it. Hold its cover to rename the song, change the artist or give it new artwork.
+
+✦ Sound that’s yours
+
+A 5-band equalizer with Flat, Bass, Vocal, Treble and Rock presets, so every track sounds the way you like.
+
+✦ Dressed for your mood
+
+Four themes: Dark, Light, Cyan and Purple.
+
+✦ Respectful by design
+
+Everything stays on your device. Muzi has no accounts, no tracking and no ads. Deleting a song or editing its details only changes Muzi’s library, and your original files are never touched.
+
+Muzi Music. Minimal. Stylish. Yours.
+Works on Android 5.0 and newer.

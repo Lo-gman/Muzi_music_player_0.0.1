@@ -1,1 +1,1 @@
-Lightweight native Android music player with equalizer and zero dependencies.
+A sleek, minimal music player for the songs already on your phone. It has no accounts and no ads, just your music with style.
