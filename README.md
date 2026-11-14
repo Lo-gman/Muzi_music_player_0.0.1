@@ -5,7 +5,7 @@
 ## Build with GitHub
 1. Upload everything in this folder to a GitHub repository (keep the `.github` folder).
 2. Open the **Actions** tab, pick **Build Muzi APK**, press **Run workflow**.
-3. When it turns green, download **Muzi-debug-apk** under Artifacts and install `app-debug.apk`.
+3. When it turns green, download **Muzi-release-apk** or **Muzi-debug-apk** under Artifacts.
 
 ## Folders
 - `app/src/main/java/com/logman/muzi` - all app code
