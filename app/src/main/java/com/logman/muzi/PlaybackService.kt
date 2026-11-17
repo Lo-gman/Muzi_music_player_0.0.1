@@ -11,17 +11,21 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.media.AudioManager
+import android.media.MediaDescription
 import android.media.MediaMetadata
+import android.media.browse.MediaBrowser
 import android.media.session.MediaSession
 import android.media.session.PlaybackState
 import android.os.Build
-import android.os.IBinder
+import android.os.Bundle
 import android.os.SystemClock
+import android.service.media.MediaBrowserService
+import android.view.KeyEvent
 import android.widget.RemoteViews
 import java.util.Locale
 
-/** Keeps the app alive while music plays and owns the notification, lock-screen controls and widgets. */
-class PlaybackService : Service(), Engine.Listener {
+/** Keeps the app alive while music plays and owns the notification, lock-screen controls, Android Auto media browser, and widgets. */
+class PlaybackService : MediaBrowserService(), Engine.Listener {
     companion object {
         const val CHANNEL = "muzi_playback"
         const val NOTIF_ID = 11
@@ -55,11 +59,47 @@ class PlaybackService : Service(), Engine.Listener {
                 CMD_PREV -> Engine.prev()
                 CMD_FAV -> Engine.current?.let { Lib.toggleFav(it.key) }
                 AudioManager.ACTION_AUDIO_BECOMING_NOISY -> if (Engine.playing) Engine.pause()
+                Intent.ACTION_MEDIA_BUTTON -> {
+                    val ke = if (Build.VERSION.SDK_INT >= 33) {
+                        intent.getParcelableExtra(Intent.EXTRA_KEY_EVENT, KeyEvent::class.java)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        intent.getParcelableExtra(Intent.EXTRA_KEY_EVENT) as? KeyEvent
+                    }
+                    if (ke != null && ke.action == KeyEvent.ACTION_DOWN) {
+                        when (ke.keyCode) {
+                            KeyEvent.KEYCODE_MEDIA_PLAY -> Engine.play()
+                            KeyEvent.KEYCODE_MEDIA_PAUSE -> Engine.pause()
+                            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_HEADSETHOOK -> Engine.toggle()
+                            KeyEvent.KEYCODE_MEDIA_NEXT -> Engine.next(false)
+                            KeyEvent.KEYCODE_MEDIA_PREVIOUS -> Engine.prev()
+                            KeyEvent.KEYCODE_MEDIA_STOP -> Engine.pause()
+                        }
+                    }
+                }
             }
         }
     }
 
-    override fun onBind(intent: Intent?): IBinder? = null
+    // ---------------------------------------------------------------- Android Auto MediaBrowserService
+    override fun onGetRoot(clientPackageName: String, clientUid: Int, rootHints: Bundle?): BrowserRoot? {
+        return BrowserRoot("root", null)
+    }
+
+    override fun onLoadChildren(parentId: String, result: Result<MutableList<MediaBrowser.MediaItem>>) {
+        val items = mutableListOf<MediaBrowser.MediaItem>()
+        for (t in Lib.tracks) {
+            val desc = MediaDescription.Builder()
+                .setMediaId(t.key)
+                .setTitle(t.title)
+                .setSubtitle(t.artist)
+                .setDescription(t.album)
+                .setIconBitmap(Covers.peek(t, 100))
+                .build()
+            items.add(MediaBrowser.MediaItem(desc, MediaBrowser.MediaItem.FLAG_PLAYABLE))
+        }
+        result.sendResult(items)
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -73,15 +113,18 @@ class PlaybackService : Service(), Engine.Listener {
         val f = IntentFilter()
         f.addAction(CMD_TOGGLE); f.addAction(CMD_NEXT); f.addAction(CMD_PREV); f.addAction(CMD_FAV)
         f.addAction(AudioManager.ACTION_AUDIO_BECOMING_NOISY)
-        if (Build.VERSION.SDK_INT >= 33) registerReceiver(receiver, f, Context.RECEIVER_NOT_EXPORTED)
-        else registerReceiver(receiver, f)
+        f.addAction(Intent.ACTION_MEDIA_BUTTON)
+        if (Build.VERSION.SDK_INT >= 33) {
+            registerReceiver(receiver, f, RECEIVER_EXPORTED)
+        } else {
+            @Suppress("UnspecifiedRegisterReceiverFlag")
+            registerReceiver(receiver, f)
+        }
 
         @Suppress("DEPRECATION")
         val s = MediaSession(this, "MuziMusic")
-        if (Build.VERSION.SDK_INT < 26) {
-            @Suppress("DEPRECATION")
-            s.setFlags(MediaSession.FLAG_HANDLES_MEDIA_BUTTONS or MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS)
-        }
+        @Suppress("DEPRECATION")
+        s.setFlags(MediaSession.FLAG_HANDLES_MEDIA_BUTTONS or MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS)
         s.setCallback(object : MediaSession.Callback() {
             override fun onPlay() { Engine.play() }
             override fun onPause() { Engine.pause() }
@@ -89,14 +132,39 @@ class PlaybackService : Service(), Engine.Listener {
             override fun onSkipToPrevious() { Engine.prev() }
             override fun onSeekTo(pos: Long) { Engine.seekTo(pos.toInt()) }
             override fun onStop() { Engine.pause() }
+            override fun onPlayFromMediaId(mediaId: String?, extras: Bundle?) {
+                if (mediaId != null) {
+                    val idx = Lib.tracks.indexOfFirst { it.key == mediaId }
+                    if (idx >= 0) Engine.setQueue(Lib.tracks, idx, true)
+                }
+            }
+            override fun onMediaButtonEvent(mediaButtonIntent: Intent): Boolean {
+                val ke = if (Build.VERSION.SDK_INT >= 33) {
+                    mediaButtonIntent.getParcelableExtra(Intent.EXTRA_KEY_EVENT, KeyEvent::class.java)
+                } else {
+                    @Suppress("DEPRECATION")
+                    mediaButtonIntent.getParcelableExtra(Intent.EXTRA_KEY_EVENT) as? KeyEvent
+                }
+                if (ke != null && ke.action == KeyEvent.ACTION_DOWN) {
+                    when (ke.keyCode) {
+                        KeyEvent.KEYCODE_MEDIA_PLAY -> { Engine.play(); return true }
+                        KeyEvent.KEYCODE_MEDIA_PAUSE -> { Engine.pause(); return true }
+                        KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_HEADSETHOOK -> { Engine.toggle(); return true }
+                        KeyEvent.KEYCODE_MEDIA_NEXT -> { Engine.next(false); return true }
+                        KeyEvent.KEYCODE_MEDIA_PREVIOUS -> { Engine.prev(); return true }
+                        KeyEvent.KEYCODE_MEDIA_STOP -> { Engine.pause(); return true }
+                    }
+                }
+                return super.onMediaButtonEvent(mediaButtonIntent)
+            }
         })
         s.isActive = true
         session = s
+        sessionToken = s.sessionToken
         Engine.addListener(this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // must call startForeground quickly after startForegroundService()
         try {
             val n = buildNotification()
             if (Build.VERSION.SDK_INT >= 29) startForeground(NOTIF_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
@@ -193,7 +261,7 @@ class PlaybackService : Service(), Engine.Listener {
             .setVisibility(Notification.VISIBILITY_PUBLIC)
         Engine.cover?.let { b.setLargeIcon(it) }
 
-        if (Build.VERSION.SDK_INT >= 31) {
+        if (Build.VERSION.SDK_INT >= 26) {
             b.addAction(android.R.drawable.ic_media_previous, "Previous", pi(CMD_PREV, 1))
             b.addAction(
                 if (playing) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play,

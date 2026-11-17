@@ -91,7 +91,7 @@ class PlayerPage(act: MainActivity) : Page(act) {
         heart.setOnClickListener { Engine.current?.let { Lib.toggleFav(it.key) } }
         shuffleBtn.setOnClickListener { Engine.setShuffle(!Engine.shuffle) }
         repeatBtn.setOnClickListener { Engine.cycleRepeat() }
-        listBtn.setOnClickListener { act.go(1) }
+        listBtn.setOnClickListener { if (act.isWideLayout()) act.go(2) else act.go(1) }
         moreBtn.setOnClickListener { act.go(2) }
         prevBtn.setOnClickListener { Engine.prev() }
         nextBtn.setOnClickListener { Engine.next(false) }
@@ -108,7 +108,8 @@ class PlayerPage(act: MainActivity) : Page(act) {
     private fun build(): View {
         val col = LinearLayout(act)
         col.orientation = LinearLayout.VERTICAL
-        col.setPadding(act.dp(22), act.dp(6), act.dp(22), act.dp(70))
+        val bottomPad = if (act.isWideLayout()) act.dp(16) else act.dp(70)
+        col.setPadding(act.dp(22), act.dp(6), act.dp(22), bottomPad)
 
         val head = LinearLayout(act)
         head.orientation = LinearLayout.HORIZONTAL

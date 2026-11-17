@@ -98,12 +98,14 @@ class MainActivity : Activity(), Engine.Listener {
     override fun onChanged() {
         runOnUiThread {
             playPage.refresh()
-            if (page == 1) libPage.refresh()
+            // In wide layout library is always visible; in portrait refresh only when active
+            if (isWideLayout() || page == 1) libPage.refresh()
         }
     }
 
     override fun onTick() {
-        if (page == 0) runOnUiThread { playPage.onTick() }
+        // Player is always visible in wide layout
+        if (isWideLayout() || page == 0) runOnUiThread { playPage.onTick() }
     }
 
     private fun refreshAll() {
@@ -126,55 +128,34 @@ class MainActivity : Activity(), Engine.Listener {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
-        if (page != 0) { go(0); return }
+        if (page == 2) { go(0); return }
+        if (!isWideLayout() && page != 0) { go(0); return }
         if (Engine.playing) moveTaskToBack(true) else super.onBackPressed()
     }
 
     fun toast(m: String) = Toast.makeText(this, m, Toast.LENGTH_SHORT).show()
 
     // ------------------------------------------------------------------ UI
+    /** True when the screen is wider than it is tall (landscape) or is a tablet (sw >= 600 dp). */
+    fun isWideLayout(): Boolean {
+        val dm = resources.displayMetrics
+        val swDp = minOf(dm.widthPixels, dm.heightPixels) / dm.density
+        return dm.widthPixels > dm.heightPixels || swDp >= 600f
+    }
+
     @Suppress("DEPRECATION")
     private fun buildUi(start: Int) {
         val th = appTheme
         root = FrameLayout(this)
         root.setBackgroundColor(th.bg)
-        content = LinearLayout(this)
-        content.orientation = LinearLayout.VERTICAL
 
-        // logo
         val dm = resources.displayMetrics
-        val lw = minOf(dp(175), (dm.widthPixels * 0.406f).toInt())
-        val lh = lw * 142 / 520
-        val logo = FrameLayout(this)
-        fun layer(res: Int, color: Int) {
-            val iv = ImageView(this)
-            iv.setImageResource(res)
-            iv.scaleType = ImageView.ScaleType.FIT_XY
-            iv.setColorFilter(color, android.graphics.PorterDuff.Mode.SRC_IN)
-            logo.addView(iv, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
-        }
-        layer(R.drawable.logo_muz, th.fg)
-        layer(R.drawable.logo_bang, th.bang)
-        layer(R.drawable.logo_c, th.fg)
-        logo.contentDescription = "Muzic"
-        val llp = LinearLayout.LayoutParams(lw, lh)
-        llp.leftMargin = dp(22)
-        llp.topMargin = (dm.heightPixels * 0.10f).toInt()
-        llp.bottomMargin = dp(6)
-        content.addView(logo, llp)
 
-        playPage = PlayerPage(this)
-        libPage = LibraryPage(this)
-        setPage = SettingsPage(this)
-        pages = listOf(playPage, libPage, setPage)
-        val frame = FrameLayout(this)
-        for ((i, p) in pages.withIndex()) {
-            p.view.visibility = if (i == start) View.VISIBLE else View.GONE
-            frame.addView(p.view, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        if (isWideLayout()) {
+            buildWideUi(th, dm, start)
+        } else {
+            buildPortraitUi(th, dm, start)
         }
-        page = start
-        content.addView(frame, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
-        root.addView(content, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
 
         root.setOnApplyWindowInsetsListener { _, ins ->
             if (Build.VERSION.SDK_INT >= 30) {
@@ -214,6 +195,112 @@ class MainActivity : Activity(), Engine.Listener {
         root.requestApplyInsets()
     }
 
+    // ------------------------------------------------------------------ Portrait layout
+    @Suppress("DEPRECATION")
+    private fun buildPortraitUi(th: AppTheme, dm: android.util.DisplayMetrics, start: Int) {
+        content = LinearLayout(this)
+        content.orientation = LinearLayout.VERTICAL
+
+        // logo
+        val lw = minOf(dp(175), (dm.widthPixels * 0.406f).toInt())
+        val lh = lw * 142 / 520
+        val logo = buildLogo(th)
+        logo.contentDescription = "Muzic"
+        val llp = LinearLayout.LayoutParams(lw, lh)
+        llp.leftMargin = dp(22)
+        llp.topMargin = (dm.heightPixels * 0.10f).toInt()
+        llp.bottomMargin = dp(6)
+        content.addView(logo, llp)
+
+        playPage = PlayerPage(this)
+        libPage = LibraryPage(this)
+        setPage = SettingsPage(this)
+        pages = listOf(playPage, libPage, setPage)
+        val frame = FrameLayout(this)
+        for ((i, p) in pages.withIndex()) {
+            p.view.visibility = if (i == start) View.VISIBLE else View.GONE
+            frame.addView(p.view, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        }
+        page = start
+        content.addView(frame, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        root.addView(content, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+    }
+
+    // ------------------------------------------------------------------ Wide (landscape / tablet) layout
+    @Suppress("DEPRECATION")
+    private fun buildWideUi(th: AppTheme, dm: android.util.DisplayMetrics, start: Int) {
+        // In wide layout: left pane = NowPlaying (with logo), right pane = Library (no logo).
+        // Settings is shown full-screen over the top (FrameLayout overlay).
+        content = LinearLayout(this)
+        content.orientation = LinearLayout.HORIZONTAL
+
+        // ---- LEFT pane: logo + player ----
+        val leftPane = LinearLayout(this)
+        leftPane.orientation = LinearLayout.VERTICAL
+
+        val lw = minOf(dp(160), (dm.widthPixels * 0.25f).toInt())
+        val lh = lw * 142 / 520
+        val logo = buildLogo(th)
+        logo.contentDescription = "Muzic"
+        val llp = LinearLayout.LayoutParams(lw, lh)
+        llp.leftMargin = dp(18)
+        llp.topMargin = dp(18)
+        llp.bottomMargin = dp(4)
+        leftPane.addView(logo, llp)
+
+        playPage = PlayerPage(this)
+        leftPane.addView(playPage.view, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+
+        // Thin divider between panes
+        val divider = View(this)
+        divider.setBackgroundColor(th.line)
+
+        // ---- RIGHT pane: library only (no logo) ----
+        val rightPane = FrameLayout(this)
+        libPage = LibraryPage(this)
+        rightPane.addView(libPage.view, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+
+        // Settings page lives in an overlay on the root FrameLayout (full-screen)
+        setPage = SettingsPage(this)
+        setPage.view.visibility = View.GONE
+
+        // Determine split ratio: 45% player / 55% library on landscape phone,
+        // or 40/60 on tablet (sw>=600). Use weight.
+        val dm2 = resources.displayMetrics
+        val swDp = minOf(dm2.widthPixels, dm2.heightPixels) / dm2.density
+        val leftWeight = if (swDp >= 600f) 0.42f else 0.45f
+        val rightWeight = 1f - leftWeight
+
+        content.addView(leftPane, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, leftWeight))
+        content.addView(divider, LinearLayout.LayoutParams(dp(1), ViewGroup.LayoutParams.MATCH_PARENT))
+        content.addView(rightPane, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, rightWeight))
+
+        root.addView(content, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        // Settings overlay on top of everything
+        root.addView(setPage.view, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+
+        pages = listOf(playPage, libPage, setPage)
+        // In wide layout page index is irrelevant for player/library, but keep it pointing to 0
+        page = if (start == 2) 2 else 0
+        if (start == 2) setPage.view.visibility = View.VISIBLE
+    }
+
+    /** Builds the layered logo FrameLayout (without size applied — caller sets LayoutParams). */
+    private fun buildLogo(th: AppTheme): FrameLayout {
+        val logo = FrameLayout(this)
+        fun layer(res: Int, color: Int) {
+            val iv = ImageView(this)
+            iv.setImageResource(res)
+            iv.scaleType = ImageView.ScaleType.FIT_XY
+            iv.setColorFilter(color, android.graphics.PorterDuff.Mode.SRC_IN)
+            logo.addView(iv, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        }
+        layer(R.drawable.logo_muz, th.fg)
+        layer(R.drawable.logo_bang, th.bang)
+        layer(R.drawable.logo_c, th.fg)
+        return logo
+    }
+
     fun changeTheme(name: String) {
         if (name == Prefs.theme) return
         Prefs.theme = name
@@ -222,7 +309,34 @@ class MainActivity : Activity(), Engine.Listener {
     }
 
     fun go(p: Int) {
-        if (p == page || p < 0 || p > 2) return
+        if (p < 0 || p > 2) return
+        if (isWideLayout()) {
+            // In wide layout player (0) and library (1) are always visible side-by-side.
+            // Only animate Settings (2) in/out as a full-screen overlay.
+            if (p == 2) {
+                // Show settings overlay
+                page = 2
+                setPage.refresh()
+                setPage.view.visibility = View.VISIBLE
+                setPage.view.alpha = 0f
+                setPage.view.translationX = dp(48).toFloat()
+                setPage.view.animate().translationX(0f).alpha(1f).setDuration(260).setInterpolator(DecelerateInterpolator()).start()
+                setPage.onShow()
+            } else if (page == 2) {
+                // Dismiss settings overlay
+                page = 0
+                setPage.view.animate().translationX(dp(48).toFloat()).alpha(0f).setDuration(220)
+                    .withEndAction { setPage.view.visibility = View.GONE }.start()
+                // Refresh both always-visible pages
+                playPage.refresh()
+                libPage.refresh()
+                if (p == 1) libPage.locate(true)
+            }
+            // Navigating between 0 and 1 is a no-op in wide layout (both always shown)
+            return
+        }
+        // Portrait single-page navigation
+        if (p == page) return
         val old = pages[page]
         val nw = pages[p]
         val dir = if (p > page) 1 else -1
@@ -253,7 +367,15 @@ class MainActivity : Activity(), Engine.Listener {
                     val dx = ev.rawX - downX
                     val dy = ev.rawY - downY
                     if (Math.abs(dx) > dp(70) && Math.abs(dy) < Math.abs(dx) * 0.6f) {
-                        if (dx < 0) go(page + 1) else go(page - 1)
+                        if (isWideLayout()) {
+                            if (dx < 0 && page != 2) {
+                                go(2)
+                            } else if (dx > 0 && page == 2) {
+                                go(0)
+                            }
+                        } else {
+                            if (dx < 0) go(page + 1) else go(page - 1)
+                        }
                     }
                 }
                 swipeOk = false
