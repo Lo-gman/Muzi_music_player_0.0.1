@@ -361,8 +361,9 @@ object Engine {
         } catch (e: Exception) { }
     }
 
-    // ------------------------------------------------------------------ equalizer
+    // ------------------------------------------------------------------ equalizer & audio enhancer
     private val BANDS = intArrayOf(60, 230, 910, 3600, 14000)
+    private var le: android.media.audiofx.LoudnessEnhancer? = null
 
     fun applyEq() {
         try {
@@ -370,20 +371,37 @@ object Engine {
             var e = eq
             if (e == null) { e = Equalizer(0, m.audioSessionId); eq = e }
             e.enabled = Prefs.eqOn
-            if (!Prefs.eqOn) return
-            val gains = Prefs.eqGains
-            val range = e.bandLevelRange
-            val n = e.numberOfBands.toInt()
-            for (b in 0 until n) {
-                val centerHz = e.getCenterFreq(b.toShort()) / 1000
-                var best = 0
-                var bestD = Double.MAX_VALUE
-                for (i in BANDS.indices) {
-                    val d = Math.abs(Math.log(centerHz.toDouble().coerceAtLeast(1.0) / BANDS[i]))
-                    if (d < bestD) { bestD = d; best = i }
+            if (Prefs.eqOn) {
+                val gains = Prefs.eqGains
+                val range = e.bandLevelRange
+                val n = e.numberOfBands.toInt()
+                for (b in 0 until n) {
+                    val centerHz = e.getCenterFreq(b.toShort()) / 1000
+                    var best = 0
+                    var bestD = Double.MAX_VALUE
+                    for (i in BANDS.indices) {
+                        val d = Math.abs(Math.log(centerHz.toDouble().coerceAtLeast(1.0) / BANDS[i]))
+                        if (d < bestD) { bestD = d; best = i }
+                    }
+                    val level = (gains[best] * 100).coerceIn(range[0].toInt(), range[1].toInt())
+                    e.setBandLevel(b.toShort(), level.toShort())
                 }
-                val level = (gains[best] * 100).coerceIn(range[0].toInt(), range[1].toInt())
-                e.setBandLevel(b.toShort(), level.toShort())
+            }
+            applyLoudness()
+        } catch (e: Exception) { }
+    }
+
+    fun applyLoudness() {
+        try {
+            val m = mp ?: return
+            if (Build.VERSION.SDK_INT >= 19) {
+                var enhancer = le
+                if (enhancer == null) {
+                    enhancer = android.media.audiofx.LoudnessEnhancer(m.audioSessionId)
+                    le = enhancer
+                }
+                enhancer.setTargetGain(Prefs.loudnessGain)
+                enhancer.enabled = Prefs.loudnessOn
             }
         } catch (e: Exception) { }
     }

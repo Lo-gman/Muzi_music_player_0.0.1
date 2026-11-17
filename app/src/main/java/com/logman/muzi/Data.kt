@@ -48,6 +48,12 @@ object Prefs {
             return IntArray(5) { parts.getOrNull(it)?.toIntOrNull() ?: 0 }
         }
         set(v) { sp.edit().putString("eqGains", v.joinToString(",")).apply() }
+    var loudnessOn: Boolean
+        get() = sp.getBoolean("loudnessOn", false)
+        set(v) { sp.edit().putBoolean("loudnessOn", v).apply() }
+    var loudnessGain: Int
+        get() = sp.getInt("loudnessGain", 300)
+        set(v) { sp.edit().putInt("loudnessGain", v).apply() }
     var lastKey: String
         get() = sp.getString("lastKey", "") ?: ""
         set(v) { sp.edit().putString("lastKey", v).apply() }

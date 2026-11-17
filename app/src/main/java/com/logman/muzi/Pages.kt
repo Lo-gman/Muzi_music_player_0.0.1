@@ -144,13 +144,19 @@ class PlayerPage(act: MainActivity) : Page(act) {
         times.addView(tDur, lp(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         col.addView(times, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.leftMargin = act.dp(4); it.rightMargin = act.dp(4) })
 
+        val isWide = act.isWideLayout()
+        val topMargin = if (isWide) act.dp(6) else act.dp(14)
+        val ctlMargin = if (isWide) act.dp(18) else act.dp(30)
+        val ctlSize = if (isWide) act.dp(52) else act.dp(60)
+        val prevSize = if (isWide) act.dp(40) else act.dp(46)
+
         val ctl = LinearLayout(act)
         ctl.orientation = LinearLayout.HORIZONTAL
         ctl.gravity = Gravity.CENTER
-        ctl.addView(prevBtn, lp(act.dp(46), act.dp(46)))
-        ctl.addView(playBtn, lp(act.dp(60), act.dp(60)).also { it.leftMargin = act.dp(30); it.rightMargin = act.dp(30) })
-        ctl.addView(nextBtn, lp(act.dp(46), act.dp(46)))
-        col.addView(ctl, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = act.dp(14) })
+        ctl.addView(prevBtn, lp(prevSize, prevSize))
+        ctl.addView(playBtn, lp(ctlSize, ctlSize).also { it.leftMargin = ctlMargin; it.rightMargin = ctlMargin })
+        ctl.addView(nextBtn, lp(prevSize, prevSize))
+        col.addView(ctl, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = topMargin })
 
         val scroll = ScrollView(act)
         scroll.isVerticalScrollBarEnabled = false
@@ -590,6 +596,54 @@ class SettingsPage(act: MainActivity) : Page(act) {
         val note = text(12f, th.mute, false)
         note.text = "The equalizer applies to everything played in the app."
         col.addView(note, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = act.dp(12) })
+
+        // ---- Loudness Normalization (Audio Enhancer)
+        val loudHead = LinearLayout(act)
+        loudHead.orientation = LinearLayout.HORIZONTAL
+        loudHead.gravity = Gravity.CENTER_VERTICAL
+        val loudTitle = sectionTitle("audio enhancer (loudness)")
+        loudTitle.textSize = 20f
+        loudHead.addView(loudTitle, lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        val loudToggle = ToggleView(act)
+        loudToggle.accent = th.acc
+        loudToggle.ink = th.fg
+        loudToggle.on = Prefs.loudnessOn
+        loudToggle.onChange = { on -> Prefs.loudnessOn = on; Engine.applyLoudness() }
+        loudHead.addView(loudToggle, lp(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        col.addView(loudHead, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = act.dp(18) })
+
+        val loudRow = LinearLayout(act)
+        loudRow.orientation = LinearLayout.HORIZONTAL
+        loudRow.gravity = Gravity.CENTER_VERTICAL
+        val loudLab = text(12f, th.mute, false)
+        loudLab.text = "boost"
+        loudRow.addView(loudLab, lp(act.dp(58), ViewGroup.LayoutParams.WRAP_CONTENT))
+        val loudSb = SeekBar(act)
+        loudSb.max = 1000
+        loudSb.progress = Prefs.loudnessGain.coerceIn(0, 1000)
+        loudSb.progressTintList = android.content.res.ColorStateList.valueOf(th.acc)
+        loudSb.thumbTintList = android.content.res.ColorStateList.valueOf(th.fg)
+        loudSb.progressBackgroundTintList = android.content.res.ColorStateList.valueOf(th.fg)
+        loudSb.setOnTouchListener { _, ev ->
+            if (ev.actionMasked == MotionEvent.ACTION_DOWN) act.noSwipe = true
+            false
+        }
+        val loudVal = text(12f, th.mute, false)
+        loudVal.gravity = Gravity.END
+        loudVal.text = "${Prefs.loudnessGain} mB"
+        loudSb.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(s: SeekBar?, p: Int, fromUser: Boolean) {
+                if (!fromUser) return
+                Prefs.loudnessGain = p
+                loudVal.text = "$p mB"
+                Engine.applyLoudness()
+            }
+            override fun onStartTrackingTouch(s: SeekBar?) {}
+            override fun onStopTrackingTouch(s: SeekBar?) {}
+        })
+        loudRow.addView(loudSb, lp(0, act.dp(30), 1f))
+        loudRow.addView(loudVal, lp(act.dp(52), ViewGroup.LayoutParams.WRAP_CONTENT))
+        col.addView(loudRow, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = act.dp(4) })
 
         val foot = text(12f, th.mute, false)
         foot.gravity = Gravity.CENTER
