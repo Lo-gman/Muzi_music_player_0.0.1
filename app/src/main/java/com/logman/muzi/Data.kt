@@ -63,6 +63,9 @@ object Prefs {
     var firstScanDone: Boolean
         get() = sp.getBoolean("firstScanDone", false)
         set(v) { sp.edit().putBoolean("firstScanDone", v).apply() }
+    var searchQuery: String
+        get() = sp.getString("searchQuery", "") ?: ""
+        set(v) { sp.edit().putString("searchQuery", v).apply() }
 }
 
 class Track(

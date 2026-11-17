@@ -14,7 +14,6 @@ import android.widget.BaseAdapter
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
-import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ListView
 import android.widget.ScrollView
@@ -91,7 +90,7 @@ class PlayerPage(act: MainActivity) : Page(act) {
         heart.setOnClickListener { Engine.current?.let { Lib.toggleFav(it.key) } }
         shuffleBtn.setOnClickListener { Engine.setShuffle(!Engine.shuffle) }
         repeatBtn.setOnClickListener { Engine.cycleRepeat() }
-        listBtn.setOnClickListener { if (act.isWideLayout()) act.go(2) else act.go(1) }
+        listBtn.setOnClickListener { act.go(1) }
         moreBtn.setOnClickListener { act.go(2) }
         prevBtn.setOnClickListener { Engine.prev() }
         nextBtn.setOnClickListener { Engine.next(false) }
@@ -106,21 +105,133 @@ class PlayerPage(act: MainActivity) : Page(act) {
     }
 
     private fun build(): View {
+        if (act.isWideLayout()) {
+            val rootLayout = FrameLayout(act)
+            val coverContainer = FrameLayout(act)
+            cover.big = true
+            coverContainer.addView(cover, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+
+            // Gradient scrim at bottom for text readability against artwork
+            val gradientView = View(act)
+            val gd = GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(Color.TRANSPARENT, Color.parseColor("#B0000000"), Color.parseColor("#E0000000"))
+            )
+            gradientView.background = gd
+            coverContainer.addView(gradientView, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, act.dp(130), Gravity.BOTTOM))
+
+            // Top-left: Muz!c logo inside album cover
+            val lw = act.dp(110)
+            val lh = lw * 142 / 520
+            val logo = act.buildLogo(th)
+            val logoLp = FrameLayout.LayoutParams(lw, lh, Gravity.TOP or Gravity.START)
+            logoLp.setMargins(act.dp(12), act.dp(12), 0, 0)
+            coverContainer.addView(logo, logoLp)
+
+            // Top-right: Shuffle and Repeat icons inside album cover
+            val topControls = LinearLayout(act)
+            topControls.orientation = LinearLayout.HORIZONTAL
+            topControls.gravity = Gravity.CENTER_VERTICAL
+            topControls.addView(shuffleBtn, lp(act.dp(36), act.dp(36)))
+            topControls.addView(repeatBtn, lp(act.dp(36), act.dp(36)).also { it.leftMargin = act.dp(8) })
+            val tcLp = FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP or Gravity.END)
+            tcLp.setMargins(0, act.dp(12), act.dp(12), 0)
+            coverContainer.addView(topControls, tcLp)
+
+            // Center: Previous, Play/Pause, Next buttons (+10% size, +25% spacing)
+            val prevSize = act.dp(51)
+            val ctlSize = act.dp(66)
+            val ctlMargin = act.dp(38) // increased spacing
+            val ctl = LinearLayout(act)
+            ctl.orientation = LinearLayout.HORIZONTAL
+            ctl.gravity = Gravity.CENTER
+            ctl.addView(prevBtn, lp(prevSize, prevSize))
+            ctl.addView(playBtn, lp(ctlSize, ctlSize).also { it.leftMargin = ctlMargin; it.rightMargin = ctlMargin })
+            ctl.addView(nextBtn, lp(prevSize, prevSize))
+            coverContainer.addView(ctl, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER))
+
+            // Bottom-left: Song title and artist directly above seek bar
+            val bottomGroup = LinearLayout(act)
+            bottomGroup.orientation = LinearLayout.VERTICAL
+            bottomGroup.setPadding(act.dp(12), 0, act.dp(12), act.dp(12))
+
+            bottomGroup.addView(title, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            bottomGroup.addView(artist, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = act.dp(2) })
+
+            val seekLayout = LinearLayout(act)
+            seekLayout.orientation = LinearLayout.VERTICAL
+            seekLayout.addView(seek, lp(ViewGroup.LayoutParams.MATCH_PARENT, act.dp(24)).also { it.topMargin = act.dp(4) })
+
+            val times = LinearLayout(act)
+            times.orientation = LinearLayout.HORIZONTAL
+            times.addView(tCur, lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            times.addView(tDur, lp(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            seekLayout.addView(times, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.leftMargin = act.dp(2); it.rightMargin = act.dp(2) })
+
+            bottomGroup.addView(seekLayout, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = act.dp(4) })
+
+            coverContainer.addView(bottomGroup, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM))
+
+            // Swipe gestures on album cover: left -> next song, right -> previous song
+            var touchDownX = 0f
+            var touchDownY = 0f
+            coverContainer.setOnTouchListener { v, ev ->
+                when (ev.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> {
+                        touchDownX = ev.rawX
+                        touchDownY = ev.rawY
+                        act.noSwipe = true
+                        false
+                    }
+                    MotionEvent.ACTION_UP -> {
+                        v.performClick()
+                        val dx = ev.rawX - touchDownX
+                        val dy = ev.rawY - touchDownY
+                        if (Math.abs(dx) > act.dp(50) && Math.abs(dy) < Math.abs(dx) * 0.6f) {
+                            if (dx < 0) Engine.next(false) else Engine.prev()
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                    else -> false
+                }
+            }
+
+            val sq = SquareLayout(act)
+            sq.addView(coverContainer, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+
+            val sqLp = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER)
+            sqLp.setMargins(act.dp(12), act.dp(12), act.dp(12), act.dp(12))
+            rootLayout.addView(sq, sqLp)
+            return rootLayout
+        }
+
+        // Portrait mode matching the user's screenshot exactly
         val col = LinearLayout(act)
         col.orientation = LinearLayout.VERTICAL
-        val bottomPad = if (act.isWideLayout()) act.dp(16) else act.dp(70)
-        col.setPadding(act.dp(22), act.dp(6), act.dp(22), bottomPad)
+        col.setPadding(act.dp(22), act.dp(12), act.dp(22), act.dp(16))
+
+        val dm = act.resources.displayMetrics
+        val lw = minOf(act.dp(175), (dm.widthPixels * 0.406f).toInt())
+        val lh = lw * 142 / 520
+        val logo = act.buildLogo(th)
+        logo.contentDescription = "Muzic"
+        val llp = LinearLayout.LayoutParams(lw, lh)
+        llp.topMargin = act.dp(4)
+        llp.bottomMargin = act.dp(16)
+        col.addView(logo, llp)
 
         val head = LinearLayout(act)
         head.orientation = LinearLayout.HORIZONTAL
-        head.gravity = Gravity.TOP
+        head.gravity = Gravity.CENTER_VERTICAL
         val tcol = LinearLayout(act)
         tcol.orientation = LinearLayout.VERTICAL
         tcol.addView(title, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         tcol.addView(artist, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = act.dp(3) })
-        head.addView(tcol, lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        head.addView(heart, lp(act.dp(34), act.dp(34)))
-        col.addView(head, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = act.dp(10) })
+        head.addView(tcol, lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).also { it.rightMargin = act.dp(12) })
+        head.addView(heart, lp(act.dp(32), act.dp(32)))
+        col.addView(head, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.bottomMargin = act.dp(16) })
 
         val row = LinearLayout(act)
         row.orientation = LinearLayout.HORIZONTAL
@@ -131,32 +242,29 @@ class PlayerPage(act: MainActivity) : Page(act) {
         side.orientation = LinearLayout.VERTICAL
         side.gravity = Gravity.CENTER_HORIZONTAL
         side.addView(shuffleBtn, lp(act.dp(36), act.dp(36)))
-        side.addView(repeatBtn, lp(act.dp(36), act.dp(36)).also { it.topMargin = act.dp(8) })
+        side.addView(repeatBtn, lp(act.dp(36), act.dp(36)).also { it.topMargin = act.dp(12) })
         side.addView(FrameLayout(act), lp(act.dp(1), 0, 1f))
         side.addView(listBtn, lp(act.dp(36), act.dp(36)))
-        row.addView(side, lp(act.dp(40), ViewGroup.LayoutParams.MATCH_PARENT).also { it.leftMargin = act.dp(6) })
-        col.addView(row, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = act.dp(14) })
+        row.addView(side, lp(act.dp(40), ViewGroup.LayoutParams.MATCH_PARENT).also { it.leftMargin = act.dp(12) })
+        col.addView(row, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
 
-        col.addView(seek, lp(ViewGroup.LayoutParams.MATCH_PARENT, act.dp(28)).also { it.topMargin = act.dp(14) })
+        col.addView(seek, lp(ViewGroup.LayoutParams.MATCH_PARENT, act.dp(28)).also { it.topMargin = act.dp(24) })
         val times = LinearLayout(act)
         times.orientation = LinearLayout.HORIZONTAL
         times.addView(tCur, lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         times.addView(tDur, lp(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         col.addView(times, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.leftMargin = act.dp(4); it.rightMargin = act.dp(4) })
 
-        val isWide = act.isWideLayout()
-        val topMargin = if (isWide) act.dp(6) else act.dp(14)
-        val ctlMargin = if (isWide) act.dp(18) else act.dp(30)
-        val ctlSize = if (isWide) act.dp(52) else act.dp(60)
-        val prevSize = if (isWide) act.dp(40) else act.dp(46)
-
+        val pPrevSize = act.dp(48)
+        val pCtlSize = act.dp(64)
+        val pCtlMargin = act.dp(30)
         val ctl = LinearLayout(act)
         ctl.orientation = LinearLayout.HORIZONTAL
         ctl.gravity = Gravity.CENTER
-        ctl.addView(prevBtn, lp(prevSize, prevSize))
-        ctl.addView(playBtn, lp(ctlSize, ctlSize).also { it.leftMargin = ctlMargin; it.rightMargin = ctlMargin })
-        ctl.addView(nextBtn, lp(prevSize, prevSize))
-        col.addView(ctl, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = topMargin })
+        ctl.addView(prevBtn, lp(pPrevSize, pPrevSize))
+        ctl.addView(playBtn, lp(pCtlSize, pCtlSize).also { it.leftMargin = pCtlMargin; it.rightMargin = pCtlMargin })
+        ctl.addView(nextBtn, lp(pPrevSize, pPrevSize))
+        col.addView(ctl, lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = act.dp(32); it.bottomMargin = act.dp(20) })
 
         val scroll = ScrollView(act)
         scroll.isVerticalScrollBarEnabled = false
@@ -164,8 +272,8 @@ class PlayerPage(act: MainActivity) : Page(act) {
         val frame = FrameLayout(act)
         frame.addView(scroll, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         val lpMore = FrameLayout.LayoutParams(act.dp(44), act.dp(44), Gravity.BOTTOM or Gravity.END)
-        lpMore.rightMargin = act.dp(14)
-        lpMore.bottomMargin = act.dp(6)
+        lpMore.rightMargin = act.dp(18)
+        lpMore.bottomMargin = act.dp(12)
         frame.addView(moreBtn, lpMore)
         return frame
     }
@@ -196,6 +304,9 @@ class PlayerPage(act: MainActivity) : Page(act) {
         val fav = t != null && Lib.isFav(t.key)
         heart.setImageResource(if (fav) R.drawable.ic_n_heart_on else R.drawable.ic_n_heart)
         heart.setColorFilter(if (fav) th.acc else th.fg, PorterDuff.Mode.SRC_IN)
+        prevBtn.alpha = if (Engine.playing) 0.5f else 1.0f
+        nextBtn.alpha = if (Engine.playing) 0.5f else 1.0f
+        playBtn.alpha = 1.0f
         playBtn.setImageResource(if (Engine.playing) R.drawable.ic_n_pause else R.drawable.ic_n_play)
         shuffleBtn.setColorFilter(if (Engine.shuffle) th.acc else th.mute, PorterDuff.Mode.SRC_IN)
         repeatBtn.setImageResource(if (Engine.repeat == 2) R.drawable.ic_repeat_one else R.drawable.ic_repeat)
@@ -297,8 +408,14 @@ class LibraryPage(act: MainActivity) : Page(act) {
 
     private fun playAt(position: Int) {
         if (position < 0 || position >= shown.size) return
-        Engine.setQueue(shown, position, true)
-        act.go(0)
+        val t = shown[position]
+        val isCur = Engine.current?.key == t.key
+        if (isCur) {
+            act.go(0)
+        } else {
+            Engine.setQueue(shown, position, true)
+            reload()
+        }
     }
 
     init {
@@ -311,10 +428,16 @@ class LibraryPage(act: MainActivity) : Page(act) {
         search.imeOptions = EditorInfo.IME_ACTION_SEARCH
         search.setPadding(act.dp(12), 0, act.dp(12), 0)
         search.background = act.boxBackground(th.row, th.line, 1)
+        if (Prefs.searchQuery.isNotEmpty()) {
+            search.setText(Prefs.searchQuery)
+        }
         search.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, st: Int, c: Int, a: Int) {}
             override fun onTextChanged(s: CharSequence?, st: Int, b: Int, c: Int) {}
-            override fun afterTextChanged(s: Editable?) { reload() }
+            override fun afterTextChanged(s: Editable?) {
+                Prefs.searchQuery = s?.toString() ?: ""
+                reload()
+            }
         })
         list.adapter = adapter
         list.divider = android.graphics.drawable.ColorDrawable(th.line)
@@ -346,7 +469,9 @@ class LibraryPage(act: MainActivity) : Page(act) {
         head.gravity = Gravity.CENTER_VERTICAL
         val back = act.iconView(R.drawable.ic_back, th.fg, 30, 0)
         back.setOnClickListener { act.go(0) }
-        head.addView(back, lp(act.dp(30), act.dp(34)))
+        if (!act.isWideLayout()) {
+            head.addView(back, lp(act.dp(30), act.dp(34)))
+        }
         val ttl = text(28f, th.fg)
         ttl.text = "library"
         head.addView(ttl, lp(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
@@ -647,7 +772,7 @@ class SettingsPage(act: MainActivity) : Page(act) {
 
         val foot = text(12f, th.mute, false)
         foot.gravity = Gravity.CENTER
-        val footHtml = "<b>muzi</b> music built by <b>logman</b><br>0.0.1"
+        val footHtml = "<b>muzi</b> music built by <b>logman</b><br>2.0"
         foot.text = if (android.os.Build.VERSION.SDK_INT >= 24) {
             android.text.Html.fromHtml(footHtml, android.text.Html.FROM_HTML_MODE_LEGACY)
         } else {

@@ -44,6 +44,7 @@ class MainActivity : Activity(), Engine.Listener {
     private lateinit var setPage: SettingsPage
     private lateinit var pages: List<Page>
     private var page = 0
+    private var lastPortraitPage = 0
     private var scanning = false
     private var splashShown = false
     private val main = Handler(Looper.getMainLooper())
@@ -59,6 +60,8 @@ class MainActivity : Activity(), Engine.Listener {
         private const val REQ_IMAGE = 2002
     }
 
+    private var wasWide = false
+
     // ------------------------------------------------------------------ lifecycle
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -67,7 +70,8 @@ class MainActivity : Activity(), Engine.Listener {
         Engine.init(this)
         Engine.restore()
         appTheme = Themes.byName(Prefs.theme)
-        buildUi(0)
+        wasWide = isWideLayout()
+        buildUi(if (wasWide) 1 else 0)
         Engine.addListener(this)
         firstRun()
         handleIntent(intent)
@@ -133,14 +137,33 @@ class MainActivity : Activity(), Engine.Listener {
         if (Engine.playing) moveTaskToBack(true) else super.onBackPressed()
     }
 
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        val isNowWide = isWideLayout()
+        if (isNowWide != wasWide) {
+            wasWide = isNowWide
+            if (isNowWide) {
+                if (page != 2) {
+                    lastPortraitPage = page
+                    page = 1
+                } else {
+                    lastPortraitPage = 2
+                    page = 2
+                }
+            } else {
+                page = lastPortraitPage
+            }
+        }
+        buildUi(page)
+    }
+
     fun toast(m: String) = Toast.makeText(this, m, Toast.LENGTH_SHORT).show()
 
     // ------------------------------------------------------------------ UI
-    /** True when the screen is wider than it is tall (landscape) or is a tablet (sw >= 600 dp). */
+    /** True when the screen is wider than it is tall (landscape). */
     fun isWideLayout(): Boolean {
         val dm = resources.displayMetrics
-        val swDp = minOf(dm.widthPixels, dm.heightPixels) / dm.density
-        return dm.widthPixels > dm.heightPixels || swDp >= 600f
+        return dm.widthPixels > dm.heightPixels
     }
 
     @Suppress("DEPRECATION")
@@ -201,17 +224,6 @@ class MainActivity : Activity(), Engine.Listener {
         content = LinearLayout(this)
         content.orientation = LinearLayout.VERTICAL
 
-        // logo
-        val lw = minOf(dp(175), (dm.widthPixels * 0.406f).toInt())
-        val lh = lw * 142 / 520
-        val logo = buildLogo(th)
-        logo.contentDescription = "Muzic"
-        val llp = LinearLayout.LayoutParams(lw, lh)
-        llp.leftMargin = dp(22)
-        llp.topMargin = (dm.heightPixels * 0.10f).toInt()
-        llp.bottomMargin = dp(6)
-        content.addView(logo, llp)
-
         playPage = PlayerPage(this)
         libPage = LibraryPage(this)
         setPage = SettingsPage(this)
@@ -229,40 +241,36 @@ class MainActivity : Activity(), Engine.Listener {
     // ------------------------------------------------------------------ Wide (landscape / tablet) layout
     @Suppress("DEPRECATION")
     private fun buildWideUi(th: AppTheme, dm: android.util.DisplayMetrics, start: Int) {
-        // In wide layout: left pane = NowPlaying (with logo), right pane = Library (no logo).
-        // Settings is shown full-screen over the top (FrameLayout overlay).
+        // In wide layout: left pane = NowPlaying (no logo), right pane = Library / Settings (with logo at top).
         content = LinearLayout(this)
         content.orientation = LinearLayout.HORIZONTAL
 
-        // ---- LEFT pane: logo + player ----
-        val leftPane = LinearLayout(this)
-        leftPane.orientation = LinearLayout.VERTICAL
-
-        val lw = minOf(dp(160), (dm.widthPixels * 0.25f).toInt())
-        val lh = lw * 142 / 520
-        val logo = buildLogo(th)
-        logo.contentDescription = "Muzic"
-        val llp = LinearLayout.LayoutParams(lw, lh)
-        llp.leftMargin = dp(18)
-        llp.topMargin = dp(18)
-        llp.bottomMargin = dp(4)
-        leftPane.addView(logo, llp)
-
+        // ---- LEFT pane: player only ----
+        val leftPane = FrameLayout(this)
         playPage = PlayerPage(this)
-        leftPane.addView(playPage.view, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        leftPane.addView(playPage.view, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
 
         // Thin divider between panes
         val divider = View(this)
         divider.setBackgroundColor(th.line)
 
-        // ---- RIGHT pane: library only (no logo) ----
+        // ---- RIGHT pane: library page & settings page ----
         val rightPane = FrameLayout(this)
         libPage = LibraryPage(this)
-        rightPane.addView(libPage.view, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
-
-        // Settings page lives in an overlay on the root FrameLayout (full-screen)
         setPage = SettingsPage(this)
-        setPage.view.visibility = View.GONE
+
+        rightPane.addView(libPage.view, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        rightPane.addView(setPage.view, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+
+        if (start == 2) {
+            libPage.view.visibility = View.GONE
+            setPage.view.visibility = View.VISIBLE
+            page = 2
+        } else {
+            libPage.view.visibility = View.VISIBLE
+            setPage.view.visibility = View.GONE
+            page = 1
+        }
 
         // Determine split ratio: 45% player / 55% library on landscape phone,
         // or 40/60 on tablet (sw>=600). Use weight.
@@ -276,17 +284,12 @@ class MainActivity : Activity(), Engine.Listener {
         content.addView(rightPane, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, rightWeight))
 
         root.addView(content, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
-        // Settings overlay on top of everything
-        root.addView(setPage.view, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
 
         pages = listOf(playPage, libPage, setPage)
-        // In wide layout page index is irrelevant for player/library, but keep it pointing to 0
-        page = if (start == 2) 2 else 0
-        if (start == 2) setPage.view.visibility = View.VISIBLE
     }
 
     /** Builds the layered logo FrameLayout (without size applied — caller sets LayoutParams). */
-    private fun buildLogo(th: AppTheme): FrameLayout {
+    fun buildLogo(th: AppTheme): FrameLayout {
         val logo = FrameLayout(this)
         fun layer(res: Int, color: Int) {
             val iv = ImageView(this)
@@ -310,29 +313,39 @@ class MainActivity : Activity(), Engine.Listener {
 
     fun go(p: Int) {
         if (p < 0 || p > 2) return
+        if (!isWideLayout()) {
+            lastPortraitPage = p
+        }
         if (isWideLayout()) {
-            // In wide layout player (0) and library (1) are always visible side-by-side.
-            // Only animate Settings (2) in/out as a full-screen overlay.
             if (p == 2) {
-                // Show settings overlay
+                // Show settings in right pane
+                if (page == 2) return
                 page = 2
                 setPage.refresh()
                 setPage.view.visibility = View.VISIBLE
                 setPage.view.alpha = 0f
                 setPage.view.translationX = dp(48).toFloat()
                 setPage.view.animate().translationX(0f).alpha(1f).setDuration(260).setInterpolator(DecelerateInterpolator()).start()
+                libPage.view.animate().translationX(-dp(48).toFloat()).alpha(0f).setDuration(220)
+                    .withEndAction { libPage.view.visibility = View.GONE }.start()
                 setPage.onShow()
-            } else if (page == 2) {
-                // Dismiss settings overlay
-                page = 0
-                setPage.view.animate().translationX(dp(48).toFloat()).alpha(0f).setDuration(220)
-                    .withEndAction { setPage.view.visibility = View.GONE }.start()
-                // Refresh both always-visible pages
-                playPage.refresh()
+            } else {
+                // Show library in right pane
+                if (page != 2 && ::libPage.isInitialized && libPage.view.visibility == View.VISIBLE) return
+                val oldPage = page
+                page = 1
                 libPage.refresh()
-                if (p == 1) libPage.locate(true)
+                libPage.view.visibility = View.VISIBLE
+                libPage.view.alpha = 0f
+                libPage.view.translationX = -dp(48).toFloat()
+                libPage.view.animate().translationX(0f).alpha(1f).setDuration(260).setInterpolator(DecelerateInterpolator()).start()
+                if (::setPage.isInitialized && setPage.view.visibility == View.VISIBLE) {
+                    setPage.view.animate().translationX(dp(48).toFloat()).alpha(0f).setDuration(220)
+                        .withEndAction { setPage.view.visibility = View.GONE }.start()
+                }
+                playPage.refresh()
+                if (p == 1 || oldPage == 2) libPage.locate(true)
             }
-            // Navigating between 0 and 1 is a no-op in wide layout (both always shown)
             return
         }
         // Portrait single-page navigation
@@ -371,7 +384,7 @@ class MainActivity : Activity(), Engine.Listener {
                             if (dx < 0 && page != 2) {
                                 go(2)
                             } else if (dx > 0 && page == 2) {
-                                go(0)
+                                go(1)
                             }
                         } else {
                             if (dx < 0) go(page + 1) else go(page - 1)
