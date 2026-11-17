@@ -1,0 +1,19 @@
+AntiFeatures: []
+Categories:
+  - Multimedia
+License: MIT
+SourceCode: https://github.com/Lo-gman/Muzi_music_player_0.0.1
+IssueTracker: https://github.com/Lo-gman/Muzi_music_player_0.0.1/issues
+
+Name: Muzi Music
+Summary: A native, lightweight offline music player
+Description: |
+  Muzi is a clean, material-styled offline music player for Android featuring an equalizer, loudness enhancer, and adaptive portrait/landscape layouts.
+
+Builds:
+  - versionName: '2.0'
+    versionCode: 2
+    commit: v2.0
+    subdir: app
+    gradle:
+      - yes
